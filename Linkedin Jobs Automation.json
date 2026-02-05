@@ -1,0 +1,686 @@
+{
+  "name": "Linkedin Jobs Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "get",
+        "documentURL": "https://docs.google.com/document/d/1CLoNGR9gajhDuxIJRciZAmhuqcopPSixB8jaU37Rq9A/edit?tab=t.0"
+      },
+      "id": "f3b12de0-a6da-435d-b486-9a9960cd6a16",
+      "name": "Get Resume Template",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        -96
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "9bQm6hCy9JyuKKG7",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/curious_coder~linkedin-jobs-scraper/runs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "apify_api_RhY9ukdhnRFVWn0eSO4gRve8wjRELV4txcBQ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"urls\": [\n    \"https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=United%20States&f_JT=F\",\n    \"https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=United%20States&f_JT=C\"\n  ],\n  \"scrapeCompanyDetails\": true,\n  \"maxItems\": 100\n}\n",
+        "options": {
+          "timeout": 3600
+        }
+      },
+      "id": "9a8b3a52-f2a1-4498-9827-66d3c6f90526",
+      "name": "Scrape LinkedIn Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -448,
+        -96
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "fa6e29c6-1728-4a6e-83e0-122d8ce7ce5b",
+      "name": "Limit Results",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        272,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Evaluate the following job description against my background.\n\n=== MY BACKGROUND ===\n- 4+ years experience in AI-driven automation and backend systems\n- Strong in Python, JavaScript, FastAPI, Node.js, REST APIs\n- Experience integrating OpenAI APIs and building AI-powered workflows\n- Hands-on experience with n8n, Zapier, Make.com automation\n- Built web scraping pipelines and data processing systems\n- Experience with SQL databases, PostgreSQL, MySQL\n- Experience with cloud services (AWS)\n- Experience with CI/CD, Docker, and scalable microservices\n- Built automation pipelines handling large data volumes\n- Strong in workflow design, API integrations, and backend architecture\n- Experience in distributed systems and backend reliability\n\n=== JOB DESCRIPTION ===\n{{ $json.description }}\n\n=== EVALUATION CRITERIA ===\nReturn \"true\" ONLY if:\n- The role requires backend, automation, AI, or software engineering skills\n- The job stack significantly overlaps with Python, JavaScript, APIs, AI, automation, or backend systems\n- The candidate meets at least 60% of core required skills\n\nReturn \"false\" if:\n- The job is purely frontend, design, QA, support, marketing, or unrelated domain\n- It requires a completely different tech stack (e.g., pure iOS, pure embedded C, etc.)\n\nRespond ONLY in this format:\n\n{\n  \"Decision\": \"true\" or \"false\"\n}\n"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "8b80123f-08b7-4669-a772-9ba75da70fb2",
+      "name": "Filter Jobs with AI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        496,
+        -96
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Yh4KwO58uBJEFXnH",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "filter-condition-1",
+              "leftValue": "={{ $json.message.content.Decision }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "filter-condition-2",
+              "leftValue": "={{ $('HTTP Request').item.json.companyName }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "606110a6-2b9b-4c55-b5bd-c1a7c5cae08f",
+      "name": "Filter True & Website",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are a job customization assistant.",
+              "role": "system"
+            },
+            {
+              "content": "=Your task is to customize a provided resume using a provided job description.\n\nHere is the job description:\n{{ JSON.stringify($('Scrape LinkedIn Jobs').item.json) }}\n\nHere is my resume:\n{{ $('Get Resume Template').item.json.content }}\n\nRespond with only the resume, nothing else. This resume will be added to a Google doc. So, write it in markdown format that I can easily copy and paste. Your first character should be #."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "62d53c80-e5b1-4513-b26d-4b1da2ea4350",
+      "name": "Rewrite Resume",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1312,
+        224
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Yh4KwO58uBJEFXnH",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "html": "={{ $json.message.content }}",
+        "options": {}
+      },
+      "id": "fc3c3d03-3604-40d2-960e-04733e6935df",
+      "name": "Markdown to HTML",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "driveId": "sharedWithMe",
+        "folderId": "default",
+        "title": "={{ $('HTTP Request').item.json.title }}"
+      },
+      "id": "4c1a6ef5-a3b7-4290-809a-4886c229076a",
+      "name": "Create New Resume",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        224
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "9bQm6hCy9JyuKKG7",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anymailfinder.com/v5.1/find-email/decision-maker",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer vP98vo7tiP6cPW4w6PIaLJH3"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $('Limit Results').item.json.companyName }}.com"
+            },
+            {
+              "name": "decision_maker_category",
+              "value": "ceo"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "062b5720-a832-49e7-8423-75d0abb0c6ca",
+      "name": "Get Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -208,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "rapooja60@gmail.com",
+        "subject": "={{ $('HTTP Request').item.json.title }} - Showing vs Telling",
+        "message": "=<!DOCTYPE html>\n<html>\n  <head>\n    <style>\n      body {\n        font-family: Arial, sans-serif;\n        color: #333;\n        line-height: 1.6;\n      }\n      .container {\n        max-width: 600px;\n        margin: 0 auto;\n        padding: 24px;\n        background-color: #f9f9f9;\n        border-radius: 8px;\n      }\n      .highlight {\n        font-weight: bold;\n        color: #2a6fdb;\n      }\n      .footer {\n        margin-top: 24px;\n        font-size: 14px;\n        color: #555;\n      }\n    </style>\n  </head>\n  <body>\n    <div class=\"container\">\n      <p>Hello,</p>\n\n      <p>\n        I came across the <span class=\"highlight\">{{ $('Limit Results').item.json.title }}</span> opportunity at \n        <span class=\"highlight\">{{ $('Limit Results').item.json.companyName }}</span> and wanted to reach out directly.\n      </p>\n\n      <p>\n        With 5+ years of experience building scalable backend systems, AI-powered workflows, and automation-driven solutions, \n        I believe I can contribute meaningfully to your team.\n      </p>\n\n      <p>Here’s what I bring:</p>\n      <ul>\n        <li>Strong backend development in Python, JavaScript, and REST APIs</li>\n        <li>Experience integrating AI systems and automation workflows</li>\n        <li>Cloud-native architecture and scalable system design</li>\n        <li>End-to-end ownership of solutions from development to deployment</li>\n      </ul>\n\n      <p>\n        I’ve attached my resume for your review and would welcome the opportunity to discuss how I can add value to \n        <strong>{{ $('Limit Results').item.json.companyName }}</strong>.\n      </p>\n\n      <p>Looking forward to your response.</p>\n\n      <div class=\"footer\">\n        Best regards,<br />\n        <strong>Pooja Reddy</strong><br />\n        📧 rapooja60@gmail.com<br />\n        📧 apooja@umich.edu<br />\n        📱 +1 313-443-2914\n      </div>\n    </div>\n  </body>\n</html>\n",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {},
+              {}
+            ]
+          }
+        }
+      },
+      "id": "447e24de-001f-47e8-a721-29353a602ea3",
+      "name": "Create Draft Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        288,
+        224
+      ],
+      "webhookId": "0918f21a-9856-4cb5-a8b6-2b5ba6dcf409",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "n5r1i7sPuYL5uyI8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Linkedin Jobs Automation\n**Double click** to edit me. [Guide](https://docs.n8n.io/workflows/sticky-notes/)",
+        "height": 688,
+        "width": 2960
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1616,
+        -144
+      ],
+      "typeVersion": 1,
+      "id": "5a230567-7438-4821-847c-6718d0af69e1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobTitle = $json[\"Job Title\"] || \"Software Engineer\";\nconst jobLocation = $json[\"Job Location\"] || \"United States\";\nconst jobTypeInput = ($json[\"Job Type\"] || \"Full-time\").toLowerCase();\n\nconst jobTypeMap = {\n  \"full-time\": \"F\",\n  \"part-time\": \"P\",\n  \"internship\": \"I\",\n  \"temporary\": \"T\",\n  \"contract\": \"C\",\n  \"volunteer\": \"V\",\n  \"other\": \"O\"\n};\n\nconst jobTypeCode = jobTypeMap[jobTypeInput] || \"F\";\n\nconst encodedTitle = encodeURIComponent(jobTitle.trim());\nconst encodedLocation = encodeURIComponent(jobLocation.trim());\n\nconst searchUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodedTitle}&location=${encodedLocation}&f_JT=${jobTypeCode}`;\n\nreturn [{ json: { searchUrl } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        -96
+      ],
+      "id": "4c039f66-f5a9-400d-858b-6e7661fb5140",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8ec94cbf-1250-4b2b-b1f4-37e1c64b9fc8",
+              "name": "Job Title",
+              "value": "={{ $json['Job Title'] }}",
+              "type": "string"
+            },
+            {
+              "id": "2280f1a1-6d7d-4f49-9d0d-a3347209322c",
+              "name": "Job Location",
+              "value": "={{ $json['Job Location'] }}",
+              "type": "string"
+            },
+            {
+              "id": "697e2ee5-2950-4e6b-b4af-9ac600168e9f",
+              "name": "Job Type",
+              "value": "={{ $json['Job Type'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1088,
+        -96
+      ],
+      "id": "33235737-7f5c-477c-bfcc-869f816314bb",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "formTitle": "Get Latest Job Postings",
+        "formDescription": "it will search the latest jobs from the linkedin",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Job Title",
+              "placeholder": "Software Engineer",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Job Location",
+              "placeholder": "United States",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Job Type",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Full-time"
+                  },
+                  {
+                    "option": "Contract"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -1280,
+        -96
+      ],
+      "id": "ea8e88e1-d4de-49d4-8d62-67d160dee4d8",
+      "name": "On form submission1",
+      "webhookId": "2e3ded47-d3c2-4fc7-9621-400337761b39"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        -96
+      ],
+      "id": "d49a84ac-a8a8-4e2a-ab62-9a1f73247a65",
+      "name": "Wait",
+      "webhookId": "ec4272c9-824b-4cb5-ae79-0bb536937c3f"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/datasets/{{ $json.data.defaultDatasetId }}/items",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "apify_api_RhY9ukdhnRFVWn0eSO4gRve8wjRELV4txcBQ"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        -96
+      ],
+      "id": "41e605ca-de96-4611-b15e-637afe0d411a",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ $('Markdown to HTML').item.json.message.content }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        224
+      ],
+      "id": "6ba1f0be-4747-44e0-8630-83715c0815da",
+      "name": "Update a document",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "9bQm6hCy9JyuKKG7",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Update a document').item.json.documentId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "35815caa-6b2f-476d-af24-839a5faaae4a",
+      "name": "Share Resume1",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        48,
+        224
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "aeJA5Y6zpRV8zr7P",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Resume Template": {
+      "main": [
+        [
+          {
+            "node": "Scrape LinkedIn Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape LinkedIn Jobs": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit Results": {
+      "main": [
+        [
+          {
+            "node": "Filter Jobs with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Jobs with AI": {
+      "main": [
+        [
+          {
+            "node": "Filter True & Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter True & Website": {
+      "main": [
+        [
+          {
+            "node": "Rewrite Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rewrite Resume": {
+      "main": [
+        [
+          {
+            "node": "Markdown to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown to HTML": {
+      "main": [
+        [
+          {
+            "node": "Create New Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Resume": {
+      "main": [
+        [
+          {
+            "node": "Update a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Email": {
+      "main": [
+        [
+          {
+            "node": "Share Resume1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Get Resume Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Limit Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a document": {
+      "main": [
+        [
+          {
+            "node": "Get Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Resume1": {
+      "main": [
+        [
+          {
+            "node": "Create Draft Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "d03bd834-c676-4f20-b198-735100799792",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "328f50aef16bdc8a049ea2ad3b4fef000b7e56c77d05fa8947584a935fda43e9"
+  },
+  "id": "6v4prYoXwCZWw4GX",
+  "tags": [
+    {
+      "name": "AI Automation",
+      "id": "6A9hBX2itK4cJ33V",
+      "updatedAt": "2026-02-03T22:19:21.756Z",
+      "createdAt": "2026-02-03T22:19:21.756Z"
+    }
+  ]
+}
